@@ -1,0 +1,7 @@
+CompileFlags:
+  Add:
+    - "-Wall"
+    - "-Wextra"
+    - "-Wpedantic"
+    - "-Werror"
+    - "-std=c89"
