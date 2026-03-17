@@ -51,12 +51,12 @@ char* get_working_dir(void) {
         /* couldn't find pwd, return '.' */
         result_path = malloc(strlen(dot_path) + 1);
         if (!result_path)
-            return 0;
+            return NULL;
         return strcpy(result_path, dot_path);
     }
 
     if ((is_git_dir = check_if_git_repo(pwd)) == -1) {
-        return 0;
+        return NULL;
     }
     else if (is_git_dir) {
         /* we're in a git repo, return repo name */
@@ -65,13 +65,13 @@ char* get_working_dir(void) {
         basename = strrchr(pwd, '/');
         if (!basename) {
             errno = EDOM;
-            return 0;
+            return NULL;
         }
         basename++;
 
         result_path = malloc(strlen(basename) + 1);
         if (!result_path)
-            return 0;
+            return NULL;
         return strcpy(result_path, basename);
     }
 
@@ -80,7 +80,7 @@ char* get_working_dir(void) {
         /* return pwd as is */
         result_path = malloc(strlen(pwd) + 1);
         if (!result_path)
-            return 0;
+            return NULL;
         return strcpy(result_path, pwd);
     }
 
@@ -88,7 +88,7 @@ char* get_working_dir(void) {
     home_len = strlen(home);
     result_path = malloc(strlen(pwd) - home_len + 2);
     if (!result_path)
-        return 0;
+        return NULL;
     result_path[0] = '~';
     strcpy(result_path + 1, pwd + home_len);
     return result_path;
