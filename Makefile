@@ -11,7 +11,7 @@ $(BUILD_DIR)/%.o: %.c $(HEADERS)
 $(BUILD_DIR)/prompt-c: $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^
 
-.PHONY: all clean pedantic
+.PHONY: all clean pedantic sanitize
 
 all: $(BUILD_DIR)/prompt-c
 
@@ -22,3 +22,7 @@ pedantic:
 	$(MAKE) clean
 	$(MAKE) all CFLAGS="$(CFLAGS) -std=c89 -Wpedantic"
 	$(MAKE) clean
+
+sanitize:
+	$(MAKE) clean
+	$(MAKE) all CFLAGS="$(CFLAGS) -Wno-error -fsanitize=address,leak,undefined"
