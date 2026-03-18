@@ -8,12 +8,12 @@ $(BUILD_DIR)/%.o: %.c $(HEADERS)
 	mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD_DIR)/prompt-c: $(OBJS)
+$(BUILD_DIR)/prompterino: $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^
 
 .PHONY: all clean pedantic sanitize
 
-all: $(BUILD_DIR)/prompt-c
+all: $(BUILD_DIR)/prompterino
 
 clean:
 	rm -rf $(BUILD_DIR)
