@@ -14,6 +14,10 @@
 #define closing_delim "]"
 #define dot_path "."
 #define git_dir ".git"
+#define ansi_bold_cyan "\x1b[1;36m"
+#define ansi_bold_green "\x1b[1;32m"
+#define ansi_bold_red "\x1b[1;31m"
+#define ansi_reset "\x1b[0m"
 
 #define concat_git_status_str(field) \
     if (git_status.field) { \
@@ -385,10 +389,19 @@ int main(void) {
         if (!git_status_str)
             goto cleanup;
 
-        printf("%s %s\n> ", working_dir, git_status_str);
+        printf(
+                ansi_bold_cyan "%s " ansi_bold_red "%s\n"
+                ansi_bold_green "> " ansi_reset,
+                working_dir,
+                git_status_str
+              );
     }
     else {
-        printf("%s\n> ", working_dir);
+        printf(
+                ansi_bold_cyan "%s\n"
+                ansi_bold_green "> " ansi_reset,
+                working_dir
+              );
     }
 
     retcode = 0;
