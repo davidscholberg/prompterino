@@ -1,28 +1,47 @@
+MAKEFLAGS += --no-print-directory
+CFLAGS = -Wall -Wextra -Werror
 BUILD_DIR = build
+EXE = $(BUILD_DIR)/prompterino
 HEADERS =
 SRCS = main.c
 OBJS = $(SRCS:%.c=$(BUILD_DIR)/%.o)
-CFLAGS = -Wall -Wextra -Werror
+
+.DEFAULT_GOAL := all
 
 $(BUILD_DIR)/%.o: %.c $(HEADERS)
 	mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD_DIR)/prompterino: $(OBJS)
+$(EXE): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^
 
-.PHONY: all clean pedantic sanitize
+.PHONY: all build clean debug install pedantic release sanitize
 
-all: $(BUILD_DIR)/prompterino
+build: $(EXE)
+
+debug: CFLAGS += -g -Og
+debug: build
+
+all: debug
 
 clean:
 	rm -rf $(BUILD_DIR)
 
 pedantic:
-	$(MAKE) clean
-	$(MAKE) all CFLAGS="$(CFLAGS) -std=c89 -Wpedantic"
-	$(MAKE) clean
+	@$(MAKE) clean
+	@$(MAKE) build CFLAGS="$(CFLAGS) -std=c89 -Wpedantic"
+	@$(MAKE) clean
+
+release:
+	@$(MAKE) clean
+	@$(MAKE) build CFLAGS="$(CFLAGS) -O3"
 
 sanitize:
-	$(MAKE) clean
-	$(MAKE) all CFLAGS="$(CFLAGS) -Wno-error -fsanitize=address,leak,undefined"
+	@$(MAKE) clean
+	@$(MAKE) build CFLAGS="$(CFLAGS) -Wno-error -fsanitize=address,leak,undefined -g -Og"
+
+install: release
+	install -C -m 0755 "$(EXE)" "$(HOME)/.local/bin/"
+
+install-sanitize: sanitize
+	install -C -m 0755 "$(EXE)" "$(HOME)/.local/bin/"
