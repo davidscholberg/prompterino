@@ -5,6 +5,8 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include "config.h"
+
 #define read_size 1024
 #define branch_name_header "# branch.head "
 #define branch_ab_header "# branch.ab "
@@ -14,10 +16,6 @@
 #define closing_delim "]"
 #define dot_path "."
 #define git_dir ".git"
-#define ansi_bold_cyan "\x1b[1;36m"
-#define ansi_bold_green "\x1b[1;32m"
-#define ansi_bold_red "\x1b[1;31m"
-#define ansi_reset "\x1b[0m"
 
 #define concat_git_status_str(field) \
     if (git_status.field) { \
@@ -139,7 +137,7 @@ void parse_git_status(const char* cmd_output, struct git_status_t* git_status) {
                     git_status->branch_len = branch_name_end - cmd_output;
                 }
                 else {
-                    fprintf(stderr, "error: failed to parse branch name");
+                    fprintf(stderr, "error: failed to parse branch name\n");
                 }
             }
             else if (!strncmp(cmd_output, branch_ab_header, branch_ab_header_len)) {
@@ -147,7 +145,7 @@ void parse_git_status(const char* cmd_output, struct git_status_t* git_status) {
 
                 ab_ptr = strchr(cmd_output, '+');
                 if (!ab_ptr)
-                    fprintf(stderr, "error: failed to parse branch ahead");
+                    fprintf(stderr, "error: failed to parse branch ahead\n");
                 else if (ab_ptr[1] != '0') {
                     git_status->ahead = "+";
                     git_status->status_chars = 1;
@@ -155,7 +153,7 @@ void parse_git_status(const char* cmd_output, struct git_status_t* git_status) {
 
                 ab_ptr = strchr(cmd_output, '-');
                 if (!ab_ptr)
-                    fprintf(stderr, "error: failed to parse branch behind");
+                    fprintf(stderr, "error: failed to parse branch behind\n");
                 else if (ab_ptr[1] != '0') {
                     git_status->behind = "-";
                     git_status->status_chars = 1;
@@ -169,7 +167,7 @@ void parse_git_status(const char* cmd_output, struct git_status_t* git_status) {
         /* staged/unstaged file line */
         else if (*cmd_output == '1' || *cmd_output == '2') {
             if (cmd_output[1] == '\0' || cmd_output[2] == '\0' || cmd_output[3] == '\0')
-                fprintf(stderr, "error: failed to parse staged/unstaged changes");
+                fprintf(stderr, "error: failed to parse staged/unstaged changes\n");
             else {
                 if (cmd_output[2] != '.') {
                     git_status->staged = "&";
@@ -209,7 +207,8 @@ void parse_git_status(const char* cmd_output, struct git_status_t* git_status) {
 }
 
 /* Return string representation of git status in current repo.
- * This function will print any errors to stderr. */
+ * This function will print any errors to stderr.
+ * The caller is responsible for freeing the returned string. */
 char* get_git_status(void) {
     struct git_status_t git_status;
     const char* cmd_output;
@@ -278,38 +277,23 @@ cleanup:
     return status_str;
 }
 
-/* Check if the given dir is a git repo.*/
-int check_if_git_repo(const char* const cur_dir) {
+/* Check if current dir is a git repo.
+ * On error, this function will print to stderr and return 0. */
+int check_for_git_repo(void) {
     struct stat stat_buf;
-    char* git_path;
-    unsigned long cur_dir_len;
-    int result;
 
-    result = -1;
-
-    cur_dir_len = strlen(cur_dir);
-    git_path = malloc(cur_dir_len + strlen(git_dir) + 2);
-    if (!git_path)
-        goto cleanup;
-    strcpy(git_path, cur_dir);
-    git_path[cur_dir_len] = '/';
-    strcpy(git_path + cur_dir_len + 1, git_dir);
-
-    if (stat(git_path, &stat_buf) == -1) {
-        if (errno == ENOENT)
-            result = 0;
-        goto cleanup;
+    if (stat(git_dir, &stat_buf) == -1) {
+        if (errno != ENOENT) {
+            perror("couldn't stat git dir");
+            return 0;
+        }
     }
 
-    result = S_ISDIR(stat_buf.st_mode);
-
-cleanup:
-    free(git_path);
-
-    return result;
+    return S_ISDIR(stat_buf.st_mode);
 }
 
 /* Get current working dir (shortened in some cases).
+ * On error this function will print to stderr and return NULL.
  * Caller is responsible for freeing returned string. */
 char* get_working_dir(int is_git_dir) {
     const char* pwd;
@@ -321,8 +305,10 @@ char* get_working_dir(int is_git_dir) {
     if (!pwd) {
         /* couldn't find pwd, return '.' */
         result_path = malloc(strlen(dot_path) + 1);
-        if (!result_path)
+        if (!result_path) {
+            perror("malloc failed");
             return NULL;
+        }
         return strcpy(result_path, dot_path);
     }
 
@@ -332,14 +318,16 @@ char* get_working_dir(int is_git_dir) {
 
         basename = strrchr(pwd, '/');
         if (!basename) {
-            errno = EDOM;
+            fprintf(stderr, "couldn't determine basename of current dir\n");
             return NULL;
         }
         basename++;
 
         result_path = malloc(strlen(basename) + 1);
-        if (!result_path)
+        if (!result_path) {
+            perror("malloc failed");
             return NULL;
+        }
         return strcpy(result_path, basename);
     }
 
@@ -347,68 +335,151 @@ char* get_working_dir(int is_git_dir) {
     if (!home || strstr(pwd, home) != pwd) {
         /* return pwd as is */
         result_path = malloc(strlen(pwd) + 1);
-        if (!result_path)
+        if (!result_path) {
+            perror("malloc failed");
             return NULL;
+        }
         return strcpy(result_path, pwd);
     }
 
     /* abbreviate home component of pwd */
     home_len = strlen(home);
     result_path = malloc(strlen(pwd) - home_len + 2);
-    if (!result_path)
+    if (!result_path) {
+        perror("malloc failed");
         return NULL;
+    }
     result_path[0] = '~';
     strcpy(result_path + 1, pwd + home_len);
     return result_path;
 }
 
-int main(void) {
+/* Generate the prompt string based on the value of prompt_fmt.
+ * Prints to stderr and returns NULL on error.
+ * The caller is responsible for freeing the returned string. */
+char* get_prompt_str(void) {
     const char* working_dir;
     const char* git_status_str;
+    char* prompt_str;
     int is_git_dir;
-    int retcode;
 
     working_dir = NULL;
     git_status_str = NULL;
-    retcode = 1;
+    prompt_str = NULL;
+    is_git_dir = -1;
 
-    is_git_dir = check_if_git_repo(dot_path);
-    if (is_git_dir == -1) {
-        perror("couldn't check for git repo");
-        is_git_dir = 0;
-    }
+    /* This loop runs twice, once to get the size of the prompt string (which is
+     * then allocated on the heap) and once to write the string. */
+    while (1) {
+        const char* prompt_fmt_ptr;
+        size_t i;
+        int space_pad;
 
-    working_dir = get_working_dir(is_git_dir);
-    if (!working_dir) {
-        perror("failed to get working dir");
-        goto cleanup;
-    }
+        prompt_fmt_ptr = prompt_fmt;
+        i = 0;
+        space_pad = 0;
 
-    if (is_git_dir) {
-        git_status_str = get_git_status();
-        if (!git_status_str)
+        while (*prompt_fmt_ptr != '\0') {
+            if (*prompt_fmt_ptr == '%') {
+                char next_char;
+
+                next_char = *(prompt_fmt_ptr + 1);
+
+                if (next_char == 'd') {
+                    if (!prompt_str) {
+                        if (is_git_dir == -1)
+                            is_git_dir = check_for_git_repo();
+                        working_dir = get_working_dir(is_git_dir);
+                    }
+                    else if (working_dir) {
+                        if (space_pad)
+                            prompt_str[i] = ' ';
+                        strcpy(prompt_str + i + space_pad, working_dir);
+                    }
+                    if (working_dir)
+                        i += space_pad + strlen(working_dir);
+                }
+                else if (next_char == 'g') {
+                    if (is_git_dir == -1)
+                        is_git_dir = check_for_git_repo();
+                    if (is_git_dir) {
+                        if (!prompt_str) {
+                            git_status_str = get_git_status();
+                        }
+                        else if (git_status_str) {
+                            if (space_pad)
+                                prompt_str[i] = ' ';
+                            strcpy(prompt_str + i + space_pad, git_status_str);
+                        }
+                        if (git_status_str)
+                            i += space_pad + strlen(git_status_str);
+                    }
+                }
+                else if (next_char == 's') {
+                    space_pad = 2;
+                }
+                else if (next_char == '%') {
+                    if (prompt_str) {
+                        prompt_str[i] = '%';
+                        prompt_str[i + 1] = '\0';
+                    }
+                    i++;
+                }
+                else if (next_char == '\0') {
+                    fprintf(stderr, "error: unexpected eof after '%%' in prompt_fmt\n");
+                    goto cleanup_err;
+                }
+                else {
+                    fprintf(stderr, "error: unexpected char '%c' after '%%' in prompt_fmt\n", next_char);
+                    goto cleanup_err;
+                }
+
+                prompt_fmt_ptr += 2;
+            }
+            else {
+                if (prompt_str) {
+                    prompt_str[i] = *prompt_fmt_ptr;
+                    prompt_str[i + 1] = '\0';
+                }
+                i++;
+                prompt_fmt_ptr++;
+            }
+
+            if (space_pad)
+                space_pad--;
+        }
+
+        if (prompt_str)
             goto cleanup;
 
-        printf(
-                ansi_bold_cyan "%s " ansi_bold_red "%s\n"
-                ansi_bold_green "> " ansi_reset,
-                working_dir,
-                git_status_str
-              );
-    }
-    else {
-        printf(
-                ansi_bold_cyan "%s\n"
-                ansi_bold_green "> " ansi_reset,
-                working_dir
-              );
+        prompt_str = malloc(i + 1);
+        if (!prompt_str) {
+            perror("malloc failed");
+            goto cleanup_err;
+        }
     }
 
-    retcode = 0;
+cleanup_err:
+    free(prompt_str);
+    prompt_str = NULL;
 
 cleanup:
     free((void*)git_status_str);
     free((void*)working_dir);
 
-    return retcode;
+    return prompt_str;
+}
+
+int main(void) {
+    const char* prompt_str;
+
+    prompt_str = get_prompt_str();
+    if (prompt_str)
+        printf("%s", prompt_str);
+    else
+        printf("%s", "$ ");
+
+    free((void*)prompt_str);
+
+    return prompt_str ? EXIT_SUCCESS : EXIT_FAILURE;
 }

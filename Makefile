@@ -2,18 +2,15 @@ MAKEFLAGS += --no-print-directory
 CFLAGS = -Wall -Wextra -Werror
 BUILD_DIR = build
 EXE = $(BUILD_DIR)/prompterino
-HEADERS =
+HEADERS = config.h
 SRCS = main.c
 OBJS = $(SRCS:%.c=$(BUILD_DIR)/%.o)
 
 .DEFAULT_GOAL := all
 
-$(BUILD_DIR)/%.o: %.c $(HEADERS)
+$(EXE): $(SRCS) $(HEADERS)
 	mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(EXE): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $(EXE) $(SRCS)
 
 .PHONY: all build clean debug install pedantic release sanitize
 
