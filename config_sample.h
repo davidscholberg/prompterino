@@ -1,10 +1,18 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 
+#ifdef _WIN32
+#define ascii_start_of_heading
+#define ascii_start_of_text
+#else
+#define ascii_start_of_heading "\x01"
+#define ascii_start_of_text "\x02"
+#endif
+
 /* Macro for generating ansi color codes.
  * Includes ascii values \x01 and \x02 because bash apparently doesn't bother
  * discerning the difference between printable and non-printable chars. */
-#define ansi_make_color(color) "\x01" "\x1b[" color "\x02"
+#define ansi_make_color(color) ascii_start_of_heading "\x1b[" color ascii_start_of_text
 
 #define ansi_bold_cyan ansi_make_color("1;36m")
 #define ansi_bold_green ansi_make_color("1;32m")

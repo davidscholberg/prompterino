@@ -1,4 +1,21 @@
+#ifdef _WIN32
+
+#include <direct.h>
+
+#define popen _popen
+#define pclose _pclose
+#define S_ISDIR(sb) (((sb) & _S_IFDIR) == _S_IFDIR)
+#define path_sep '\\'
+#define home_env_var "USERPROFILE"
+
+#else
+
 #define _POSIX_C_SOURCE 2
+#define path_sep '/'
+#define home_env_var "HOME"
+
+#endif
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -283,31 +300,52 @@ int check_for_git_repo(void) {
     struct stat stat_buf;
 
     if (stat(git_dir, &stat_buf) == -1) {
-        if (errno != ENOENT) {
+        if (errno != ENOENT)
             perror("couldn't stat git dir");
-            return 0;
-        }
+        return 0;
     }
 
     return S_ISDIR(stat_buf.st_mode);
 }
 
+/* Get heap allocated string containing current dir path.
+ * The caller must free this string. */
+char* get_current_dir(void) {
+#ifdef _WIN32
+    return _getcwd(NULL, 0);
+#else
+    char* current_dir;
+    char* pwd;
+
+    current_dir = NULL;
+
+    pwd = getenv("PWD");
+    if (pwd) {
+        current_dir = malloc(strlen(pwd) + 1);
+        if (current_dir)
+            strcpy(current_dir, pwd);
+    }
+
+    return current_dir;
+#endif
+}
+
 /* Get current working dir (shortened in some cases).
  * On error this function will print to stderr and return NULL.
  * Caller is responsible for freeing returned string. */
-char* get_working_dir(int is_git_dir) {
-    const char* pwd;
+char* get_directory(int is_git_dir) {
     const char* home;
     char* result_path;
     unsigned long home_len;
+    int i;
 
-    pwd = getenv("PWD");
-    if (!pwd) {
-        /* couldn't find pwd, return '.' */
+    result_path = get_current_dir();
+    if (!result_path) {
+        /* couldn't find cwd, return '.' */
         result_path = malloc(strlen(dot_path) + 1);
         if (!result_path) {
             perror("malloc failed");
-            return NULL;
+            goto cleanup_err;
         }
         return strcpy(result_path, dot_path);
     }
@@ -316,42 +354,42 @@ char* get_working_dir(int is_git_dir) {
         /* we're in a git repo, return repo name */
         const char* basename;
 
-        basename = strrchr(pwd, '/');
+        basename = strrchr(result_path, path_sep);
         if (!basename) {
             fprintf(stderr, "couldn't determine basename of current dir\n");
-            return NULL;
+            goto cleanup_err;
         }
         basename++;
 
-        result_path = malloc(strlen(basename) + 1);
-        if (!result_path) {
-            perror("malloc failed");
-            return NULL;
+        i = 0;
+        while (basename[i] != '\0') {
+            result_path[i] = basename[i];
+            i++;
         }
-        return strcpy(result_path, basename);
+        result_path[i] = '\0';
+        return result_path;
     }
 
-    home = getenv("HOME");
-    if (!home || strstr(pwd, home) != pwd) {
-        /* return pwd as is */
-        result_path = malloc(strlen(pwd) + 1);
-        if (!result_path) {
-            perror("malloc failed");
-            return NULL;
-        }
-        return strcpy(result_path, pwd);
+    home = getenv(home_env_var);
+    if (!home || strstr(result_path, home) != result_path) {
+        /* return cwd as is */
+        return result_path;
     }
 
-    /* abbreviate home component of pwd */
+    /* abbreviate home component of cwd */
     home_len = strlen(home);
-    result_path = malloc(strlen(pwd) - home_len + 2);
-    if (!result_path) {
-        perror("malloc failed");
-        return NULL;
-    }
     result_path[0] = '~';
-    strcpy(result_path + 1, pwd + home_len);
+    i = 0;
+    while (result_path[home_len + i] != '\0') {
+        result_path[i + 1] = result_path[home_len + i];
+        i++;
+    }
+    result_path[i + 1] = '\0';
     return result_path;
+
+cleanup_err:
+    free((void*)result_path);
+    return NULL;
 }
 
 /* Generate the prompt string based on the value of prompt_fmt.
@@ -389,7 +427,7 @@ char* get_prompt_str(void) {
                     if (!prompt_str) {
                         if (is_git_dir == -1)
                             is_git_dir = check_for_git_repo();
-                        working_dir = get_working_dir(is_git_dir);
+                        working_dir = get_directory(is_git_dir);
                     }
                     else if (working_dir) {
                         if (space_pad)
