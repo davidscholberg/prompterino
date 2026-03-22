@@ -510,14 +510,19 @@ cleanup:
 
 int main(void) {
     const char* prompt_str;
+    int success;
 
     prompt_str = get_prompt_str();
-    if (prompt_str)
+    if (prompt_str) {
         printf("%s", prompt_str);
-    else
+        success = 1;
+    }
+    else {
         printf("%s", "$ ");
+        success = 0;
+    }
 
     free((void*)prompt_str);
 
-    return prompt_str ? EXIT_SUCCESS : EXIT_FAILURE;
+    return success;
 }
