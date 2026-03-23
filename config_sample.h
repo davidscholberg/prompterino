@@ -22,8 +22,8 @@
 /* Format string for the prompt.
  * Special char sequences:
  *   %d - show current directory (shortened if within home dir or git repo)
- *   %g - show git status if current dir is git repo
- *   %s - print space only if next module (e.g. %d, %s) produces output
+ *   %g - show git status summary if current dir is git repo
+ *   %s - print space only if next module (e.g. %d, %g) produces output
  *   %% - print % character */
 #define prompt_fmt ansi_bold_cyan "%d" ansi_bold_red "%s%g\n" ansi_bold_green "> " ansi_reset
 

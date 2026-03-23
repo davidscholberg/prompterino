@@ -52,11 +52,13 @@ struct git_status_t {
 };
 
 /* Helper for doing 2-pass string building.
+ * General usage steps:
  * Set the str field to NULL before you begin the 2-pass loop.
  * Inside the 2-pass loop at the top, set the pos field to 0, then call
  * strb_append to append strings to the builder.
- * At the bottom of the 2-pass loop, exit the loop if the str field is non-NULL,
- * otherwise allocate a buffer pos + 1 in size and assign it to str. */
+ * At the bottom of the 2-pass loop, exit the loop if the str field is non-NULL
+ * (this means we're at the end of the second pass), otherwise allocate a buffer
+ * pos + 1 in size and assign it to str. */
 struct strb_t {
     char* str;
     size_t pos;
