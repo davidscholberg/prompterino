@@ -28,6 +28,8 @@
 #define prompt_fmt ansi_bold_cyan "%d" ansi_bold_red "%s%g\n" ansi_bold_green "> " ansi_reset
 
 /* Indicator strings for the git status output. */
+#define git_opening_delim "["
+#define git_closing_delim "]"
 #define git_ahead_str "+"
 #define git_behind_str "-"
 #define git_untracked_str "?"

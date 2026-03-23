@@ -29,8 +29,7 @@
 #define branch_ab_header "# branch.ab "
 #define stash_header "# stash"
 #define branch_not_found_msg "(branch not found)"
-#define opening_delim " ["
-#define closing_delim "]"
+#define git_opening_delim_padded " " git_opening_delim
 #define dot_path "."
 #define git_dir ".git"
 
@@ -265,7 +264,7 @@ char* get_git_status(void) {
 
         if (git_status.status_chars) {
             /* add space and opening delim */
-            strb_append(&builder, opening_delim, strlen(opening_delim));
+            strb_append(&builder, git_opening_delim_padded, strlen(git_opening_delim_padded));
 
             if (git_status.ahead)
                 strb_append(&builder, git_status.ahead, strlen(git_status.ahead));
@@ -283,7 +282,7 @@ char* get_git_status(void) {
                 strb_append(&builder, git_status.stashed, strlen(git_status.stashed));
 
             /* add closing delim */
-            strb_append(&builder, closing_delim, strlen(closing_delim));
+            strb_append(&builder, git_closing_delim, strlen(git_closing_delim));
         }
 
         if (builder.str)
