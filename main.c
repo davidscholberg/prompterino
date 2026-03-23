@@ -219,14 +219,11 @@ void parse_git_status(const char* cmd_output, struct git_status_t* git_status) {
             git_status->status_chars = 1;
         }
 
-        /* advance to next line or end of string */
-        while (*cmd_output != '\0') {
-            cmd_output++;
-            if (*cmd_output == '\n') {
-                cmd_output++;
-                break;
-            }
-        }
+        /* advance to next line */
+        cmd_output = strchr(cmd_output, '\n');
+        if (!cmd_output)
+            break;
+        cmd_output++;
     }
 
     if (!git_status->branch) {
