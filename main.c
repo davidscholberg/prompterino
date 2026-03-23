@@ -350,7 +350,6 @@ char* get_directory(int is_git_dir) {
     const char* home;
     char* result_path;
     unsigned long home_len;
-    int i;
 
     result_path = get_current_dir();
     if (!result_path) {
@@ -374,13 +373,7 @@ char* get_directory(int is_git_dir) {
         }
         basename++;
 
-        /* TODO: replace with memmove */
-        i = 0;
-        while (basename[i] != '\0') {
-            result_path[i] = basename[i];
-            i++;
-        }
-        result_path[i] = '\0';
+        memmove(result_path, basename, strlen(basename) + 1);
         return result_path;
     }
 
@@ -393,13 +386,7 @@ char* get_directory(int is_git_dir) {
     /* abbreviate home component of cwd */
     home_len = strlen(home);
     result_path[0] = '~';
-    /* TODO: replace with memmove */
-    i = 0;
-    while (result_path[home_len + i] != '\0') {
-        result_path[i + 1] = result_path[home_len + i];
-        i++;
-    }
-    result_path[i + 1] = '\0';
+    memmove(result_path + 1, result_path + home_len, strlen(result_path) - home_len + 1);
     return result_path;
 
 cleanup_err:
