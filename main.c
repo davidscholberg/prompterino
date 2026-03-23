@@ -515,11 +515,11 @@ int main(void) {
     prompt_str = get_prompt_str();
     if (prompt_str) {
         printf("%s", prompt_str);
-        success = 1;
+        success = EXIT_SUCCESS;
     }
     else {
         printf("%s", "$ ");
-        success = 0;
+        success = EXIT_FAILURE;
     }
 
     free((void*)prompt_str);
