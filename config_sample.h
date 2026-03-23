@@ -27,4 +27,13 @@
  *   %% - print % character */
 #define prompt_fmt ansi_bold_cyan "%d" ansi_bold_red "%s%g\n" ansi_bold_green "> " ansi_reset
 
+/* Indicator strings for the git status output. */
+#define git_ahead_str "+"
+#define git_behind_str "-"
+#define git_untracked_str "?"
+#define git_unstaged_str "!"
+#define git_staged_str "&"
+#define git_unmerged_str "m"
+#define git_stashed_str "$"
+
 #endif /* _CONFIG_H_ */

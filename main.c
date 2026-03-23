@@ -180,7 +180,7 @@ void parse_git_status(const char* cmd_output, struct git_status_t* git_status) {
                 if (!ab_ptr || ab_ptr[1] == '\0')
                     fprintf(stderr, "error: failed to parse branch ahead\n");
                 else if (ab_ptr[1] != '0') {
-                    git_status->ahead = "+";
+                    git_status->ahead = git_ahead_str;
                     git_status->status_chars = 1;
                 }
 
@@ -188,12 +188,12 @@ void parse_git_status(const char* cmd_output, struct git_status_t* git_status) {
                 if (!ab_ptr || ab_ptr[1] == '\0')
                     fprintf(stderr, "error: failed to parse branch behind\n");
                 else if (ab_ptr[1] != '0') {
-                    git_status->behind = "-";
+                    git_status->behind = git_behind_str;
                     git_status->status_chars = 1;
                 }
             }
             else if (!strncmp(cmd_output, stash_header, stash_header_len)) {
-                git_status->stashed = "$";
+                git_status->stashed = git_stashed_str;
                 git_status->status_chars = 1;
             }
         }
@@ -203,23 +203,23 @@ void parse_git_status(const char* cmd_output, struct git_status_t* git_status) {
                 fprintf(stderr, "error: failed to parse staged/unstaged changes\n");
             else {
                 if (cmd_output[2] != '.') {
-                    git_status->staged = "&";
+                    git_status->staged = git_staged_str;
                     git_status->status_chars = 1;
                 }
                 if (cmd_output[3] != '.') {
-                    git_status->unstaged = "!";
+                    git_status->unstaged = git_unstaged_str;
                     git_status->status_chars = 1;
                 }
             }
         }
         /* merge conflict line */
         else if (*cmd_output == 'u') {
-            git_status->unmerged = "m";
+            git_status->unmerged = git_unmerged_str;
             git_status->status_chars = 1;
         }
         /* untracked file line */
         else if (*cmd_output == '?') {
-            git_status->untracked = "?";
+            git_status->untracked = git_untracked_str;
             git_status->status_chars = 1;
         }
 
