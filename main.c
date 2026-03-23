@@ -250,6 +250,8 @@ char* get_git_status(void) {
     struct strb_t builder;
     int cmd_status;
 
+    builder.str = NULL;
+
     cmd_output = execute_cmd("git status --porcelain=v2 --branch --show-stash 2>&1", &cmd_status);
     if (!cmd_output) {
         perror("failed to execute git command");
@@ -261,8 +263,6 @@ char* get_git_status(void) {
     }
 
     parse_git_status(cmd_output, &git_status);
-
-    builder.str = NULL;
 
     /* This loop runs twice, once to get the size of the string (which is then
      * allocated on the heap) and once to write the string. */
