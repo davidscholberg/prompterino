@@ -88,16 +88,24 @@ char* execute_cmd(const char* cmd, int* exit_status) {
     if (!out_stream)
         return NULL;
 
-    capacity = read_size;
-
-    out_str = malloc(capacity + 1);
-    if (!out_str)
-        goto cleanup;
-
+    capacity = 0;
     total_bytes = 0;
+    out_str = NULL;
 
     while (1) {
         size_t bytes_read;
+
+        if (total_bytes == capacity) {
+            char* new_out_str;
+
+            capacity = capacity ? (capacity * 2) : read_size;
+            new_out_str = realloc(out_str, capacity + 1);
+
+            if (!new_out_str)
+                goto cleanup_err;
+
+            out_str = new_out_str;
+        }
 
         bytes_read = fread(out_str + total_bytes, 1, read_size, out_stream);
         total_bytes += bytes_read;
@@ -108,18 +116,6 @@ char* execute_cmd(const char* cmd, int* exit_status) {
 
             out_str[total_bytes] = '\0';
             goto cleanup;
-        }
-
-        if (total_bytes == capacity) {
-            char* new_out_str;
-
-            capacity = capacity * 2;
-            new_out_str = realloc(out_str, capacity + 1);
-
-            if (!new_out_str)
-                goto cleanup_err;
-
-            out_str = new_out_str;
         }
     }
 
