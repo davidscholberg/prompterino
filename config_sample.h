@@ -2,8 +2,8 @@
 #define _CONFIG_H_
 
 #ifdef _WIN32
-#define ascii_start_of_heading
-#define ascii_start_of_text
+#define ascii_start_of_heading ""
+#define ascii_start_of_text ""
 #else
 #define ascii_start_of_heading "\x01"
 #define ascii_start_of_text "\x02"
