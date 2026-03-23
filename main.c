@@ -177,8 +177,7 @@ void parse_git_status(const char* cmd_output, struct git_status_t* git_status) {
                 const char* ab_ptr;
 
                 ab_ptr = strchr(cmd_output, '+');
-                /* TODO: verify that ab_ptr[1] is not null */
-                if (!ab_ptr)
+                if (!ab_ptr || ab_ptr[1] == '\0')
                     fprintf(stderr, "error: failed to parse branch ahead\n");
                 else if (ab_ptr[1] != '0') {
                     git_status->ahead = "+";
@@ -186,8 +185,7 @@ void parse_git_status(const char* cmd_output, struct git_status_t* git_status) {
                 }
 
                 ab_ptr = strchr(cmd_output, '-');
-                /* TODO: verify that ab_ptr[1] is not null */
-                if (!ab_ptr)
+                if (!ab_ptr || ab_ptr[1] == '\0')
                     fprintf(stderr, "error: failed to parse branch behind\n");
                 else if (ab_ptr[1] != '0') {
                     git_status->behind = "-";
