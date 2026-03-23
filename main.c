@@ -409,10 +409,12 @@ char* get_prompt_str(void) {
     while (1) {
         const char* prompt_fmt_ptr;
         int space_pad;
+        int space_paddable;
 
         prompt_fmt_ptr = prompt_fmt;
         builder.pos = 0;
         space_pad = 0;
+        space_paddable = 0;
 
         while (*prompt_fmt_ptr != '\0') {
             if (*prompt_fmt_ptr == '%') {
@@ -427,10 +429,12 @@ char* get_prompt_str(void) {
                         working_dir = get_directory(is_git_dir);
                     }
                     if (working_dir) {
-                        if (space_pad)
+                        if (space_paddable && space_pad)
                             strb_append(&builder, " ", 1);
                         strb_append(&builder, working_dir, strlen(working_dir));
+                        space_paddable = 1;
                     }
+                    space_pad = 0;
                 }
                 else if (next_char == 'g') {
                     if (is_git_dir == -1)
@@ -439,17 +443,23 @@ char* get_prompt_str(void) {
                         if (first_pass)
                             git_status_str = get_git_status();
                         if (git_status_str) {
-                            if (space_pad)
+                            if (space_paddable && space_pad)
                                 strb_append(&builder, " ", 1);
                             strb_append(&builder, git_status_str, strlen(git_status_str));
+                            space_paddable = 1;
                         }
                     }
+                    space_pad = 0;
                 }
                 else if (next_char == 's') {
-                    space_pad = 2;
+                    space_pad = 1;
                 }
                 else if (next_char == '%') {
+                    if (space_paddable && space_pad)
+                        strb_append(&builder, " ", 1);
                     strb_append(&builder, "%", 1);
+                    space_paddable = 1;
+                    space_pad = 0;
                 }
                 else if (next_char == '\0') {
                     fprintf(stderr, "error: unexpected eof after '%%' in prompt_fmt\n");
@@ -462,13 +472,38 @@ char* get_prompt_str(void) {
 
                 prompt_fmt_ptr += 2;
             }
-            else {
+            /* special handling for ansi escape codes not being space paddable */
+            else if (*prompt_fmt_ptr == '\x1b' && *(prompt_fmt_ptr + 1) == '[') {
+                const char* ansi_end;
+
+                ansi_end = strchr(prompt_fmt_ptr, 'm');
+                if (!ansi_end) {
+                    fprintf(stderr, "error: unexpected eof after ansi escape char\n");
+                    goto cleanup_err;
+                }
+
+                strb_append(&builder, prompt_fmt_ptr, ansi_end - prompt_fmt_ptr + 1);
+                prompt_fmt_ptr = ansi_end + 1;
+            }
+            else if (*prompt_fmt_ptr == *ascii_start_of_heading || *prompt_fmt_ptr == *ascii_start_of_text) {
                 strb_append(&builder, prompt_fmt_ptr, 1);
                 prompt_fmt_ptr++;
             }
+            else if (*prompt_fmt_ptr == '\n') {
+                strb_append(&builder, prompt_fmt_ptr, 1);
 
-            if (space_pad)
-                space_pad--;
+                space_paddable = 0;
+                prompt_fmt_ptr++;
+            }
+            else {
+                if (space_paddable && space_pad)
+                    strb_append(&builder, " ", 1);
+                strb_append(&builder, prompt_fmt_ptr, 1);
+
+                space_paddable = 1;
+                space_pad = 0;
+                prompt_fmt_ptr++;
+            }
         }
 
         if (!first_pass)
