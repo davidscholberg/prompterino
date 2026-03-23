@@ -34,13 +34,6 @@
 #define dot_path "."
 #define git_dir ".git"
 
-#define concat_git_status_str(field) \
-    if (git_status.field) { \
-        if (status_str) \
-            strcpy(status_str + i, git_status.field); \
-        i += strlen(git_status.field); \
-    }
-
 /* Object representation of a git repo's status.
  * The branch string is the only string with an associated length field since it
  * can potentially point to the middle of the command output string.
@@ -58,6 +51,29 @@ struct git_status_t {
     size_t branch_len;
     int status_chars;
 };
+
+/* Helper for doing 2-pass string building.
+ * Set the str field to NULL before you begin the 2-pass loop.
+ * Inside the 2-pass loop at the top, set the pos field to 0, then call
+ * strb_append to append strings to the builder.
+ * At the bottom of the 2-pass loop, exit the loop if the str field is non-NULL,
+ * otherwise allocate a buffer pos + 1 in size and assign it to str. */
+struct strb_t {
+    char* str;
+    size_t pos;
+};
+
+/* Append string to string builder from within a 2-pass loop.
+ * In the first pass, only pos will be updated. In the second pass, the str will
+ * be appended to. */
+void strb_append(struct strb_t* builder, const char* source, size_t size) {
+    if (builder->str) {
+        memcpy(builder->str + builder->pos, source, size);
+        builder->str[builder->pos + size] = '\0';
+    }
+
+    builder->pos += size;
+}
 
 /* Execute the given cmd in a shell.
  * The stdout is returned as a string which the caller must free.
@@ -161,6 +177,7 @@ void parse_git_status(const char* cmd_output, struct git_status_t* git_status) {
                 const char* ab_ptr;
 
                 ab_ptr = strchr(cmd_output, '+');
+                /* TODO: verify that ab_ptr[1] is not null */
                 if (!ab_ptr)
                     fprintf(stderr, "error: failed to parse branch ahead\n");
                 else if (ab_ptr[1] != '0') {
@@ -169,6 +186,7 @@ void parse_git_status(const char* cmd_output, struct git_status_t* git_status) {
                 }
 
                 ab_ptr = strchr(cmd_output, '-');
+                /* TODO: verify that ab_ptr[1] is not null */
                 if (!ab_ptr)
                     fprintf(stderr, "error: failed to parse branch behind\n");
                 else if (ab_ptr[1] != '0') {
@@ -229,10 +247,8 @@ void parse_git_status(const char* cmd_output, struct git_status_t* git_status) {
 char* get_git_status(void) {
     struct git_status_t git_status;
     const char* cmd_output;
-    char* status_str;
+    struct strb_t builder;
     int cmd_status;
-
-    status_str = NULL;
 
     cmd_output = execute_cmd("git status --porcelain=v2 --branch --show-stash 2>&1", &cmd_status);
     if (!cmd_output) {
@@ -246,52 +262,51 @@ char* get_git_status(void) {
 
     parse_git_status(cmd_output, &git_status);
 
+    builder.str = NULL;
+
     /* This loop runs twice, once to get the size of the string (which is then
      * allocated on the heap) and once to write the string. */
     while (1) {
-        size_t i;
-
-        i = 0;
+        builder.pos = 0;
 
         /* add branch */
-        if (status_str) {
-            memcpy(status_str + i, git_status.branch, git_status.branch_len);
-            status_str[i + git_status.branch_len] = '\0';
-        }
-        i += git_status.branch_len;
+        strb_append(&builder, git_status.branch, git_status.branch_len);
 
         if (git_status.status_chars) {
             /* add space and opening delim */
-            if (status_str)
-                strcpy(status_str + i, opening_delim);
-            i += strlen(opening_delim);
+            strb_append(&builder, opening_delim, strlen(opening_delim));
 
-            concat_git_status_str(ahead);
-            concat_git_status_str(behind);
-            concat_git_status_str(untracked);
-            concat_git_status_str(unstaged);
-            concat_git_status_str(staged);
-            concat_git_status_str(unmerged);
-            concat_git_status_str(stashed);
+            if (git_status.ahead)
+                strb_append(&builder, git_status.ahead, strlen(git_status.ahead));
+            if (git_status.behind)
+                strb_append(&builder, git_status.behind, strlen(git_status.behind));
+            if (git_status.untracked)
+                strb_append(&builder, git_status.untracked, strlen(git_status.untracked));
+            if (git_status.unstaged)
+                strb_append(&builder, git_status.unstaged, strlen(git_status.unstaged));
+            if (git_status.staged)
+                strb_append(&builder, git_status.staged, strlen(git_status.staged));
+            if (git_status.unmerged)
+                strb_append(&builder, git_status.unmerged, strlen(git_status.unmerged));
+            if (git_status.stashed)
+                strb_append(&builder, git_status.stashed, strlen(git_status.stashed));
 
             /* add closing delim */
-            if (status_str)
-                strcpy(status_str + i, closing_delim);
-            i += strlen(closing_delim);
+            strb_append(&builder, closing_delim, strlen(closing_delim));
         }
 
-        if (status_str)
+        if (builder.str)
             break;
 
-        status_str = malloc(i + 1);
-        if (!status_str)
+        builder.str = malloc(builder.pos + 1);
+        if (!builder.str)
             break;
     }
 
 cleanup:
     free((void*)cmd_output);
 
-    return status_str;
+    return builder.str;
 }
 
 /* Check if current dir is a git repo.
@@ -361,6 +376,7 @@ char* get_directory(int is_git_dir) {
         }
         basename++;
 
+        /* TODO: replace with memmove */
         i = 0;
         while (basename[i] != '\0') {
             result_path[i] = basename[i];
@@ -379,6 +395,7 @@ char* get_directory(int is_git_dir) {
     /* abbreviate home component of cwd */
     home_len = strlen(home);
     result_path[0] = '~';
+    /* TODO: replace with memmove */
     i = 0;
     while (result_path[home_len + i] != '\0') {
         result_path[i + 1] = result_path[home_len + i];
@@ -398,23 +415,24 @@ cleanup_err:
 char* get_prompt_str(void) {
     const char* working_dir;
     const char* git_status_str;
-    char* prompt_str;
+    struct strb_t builder;
+    int first_pass;
     int is_git_dir;
 
     working_dir = NULL;
     git_status_str = NULL;
-    prompt_str = NULL;
+    builder.str = NULL;
+    first_pass = 1;
     is_git_dir = -1;
 
     /* This loop runs twice, once to get the size of the prompt string (which is
      * then allocated on the heap) and once to write the string. */
     while (1) {
         const char* prompt_fmt_ptr;
-        size_t i;
         int space_pad;
 
         prompt_fmt_ptr = prompt_fmt;
-        i = 0;
+        builder.pos = 0;
         space_pad = 0;
 
         while (*prompt_fmt_ptr != '\0') {
@@ -424,44 +442,35 @@ char* get_prompt_str(void) {
                 next_char = *(prompt_fmt_ptr + 1);
 
                 if (next_char == 'd') {
-                    if (!prompt_str) {
+                    if (first_pass) {
                         if (is_git_dir == -1)
                             is_git_dir = check_for_git_repo();
                         working_dir = get_directory(is_git_dir);
                     }
-                    else if (working_dir) {
+                    if (working_dir) {
                         if (space_pad)
-                            prompt_str[i] = ' ';
-                        strcpy(prompt_str + i + space_pad, working_dir);
+                            strb_append(&builder, " ", 1);
+                        strb_append(&builder, working_dir, strlen(working_dir));
                     }
-                    if (working_dir)
-                        i += space_pad + strlen(working_dir);
                 }
                 else if (next_char == 'g') {
                     if (is_git_dir == -1)
                         is_git_dir = check_for_git_repo();
                     if (is_git_dir) {
-                        if (!prompt_str) {
+                        if (first_pass)
                             git_status_str = get_git_status();
-                        }
-                        else if (git_status_str) {
+                        if (git_status_str) {
                             if (space_pad)
-                                prompt_str[i] = ' ';
-                            strcpy(prompt_str + i + space_pad, git_status_str);
+                                strb_append(&builder, " ", 1);
+                            strb_append(&builder, git_status_str, strlen(git_status_str));
                         }
-                        if (git_status_str)
-                            i += space_pad + strlen(git_status_str);
                     }
                 }
                 else if (next_char == 's') {
                     space_pad = 2;
                 }
                 else if (next_char == '%') {
-                    if (prompt_str) {
-                        prompt_str[i] = '%';
-                        prompt_str[i + 1] = '\0';
-                    }
-                    i++;
+                    strb_append(&builder, "%", 1);
                 }
                 else if (next_char == '\0') {
                     fprintf(stderr, "error: unexpected eof after '%%' in prompt_fmt\n");
@@ -475,11 +484,7 @@ char* get_prompt_str(void) {
                 prompt_fmt_ptr += 2;
             }
             else {
-                if (prompt_str) {
-                    prompt_str[i] = *prompt_fmt_ptr;
-                    prompt_str[i + 1] = '\0';
-                }
-                i++;
+                strb_append(&builder, prompt_fmt_ptr, 1);
                 prompt_fmt_ptr++;
             }
 
@@ -487,25 +492,28 @@ char* get_prompt_str(void) {
                 space_pad--;
         }
 
-        if (prompt_str)
+        if (!first_pass)
             goto cleanup;
 
-        prompt_str = malloc(i + 1);
-        if (!prompt_str) {
+        builder.str = malloc(builder.pos + 1);
+        if (!builder.str) {
             perror("malloc failed");
             goto cleanup_err;
         }
+
+        if (first_pass)
+            first_pass = 0;
     }
 
 cleanup_err:
-    free(prompt_str);
-    prompt_str = NULL;
+    free(builder.str);
+    builder.str = NULL;
 
 cleanup:
     free((void*)git_status_str);
     free((void*)working_dir);
 
-    return prompt_str;
+    return builder.str;
 }
 
 int main(void) {

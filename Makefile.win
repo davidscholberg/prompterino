@@ -31,7 +31,7 @@ release:
 
 sanitize:
 	$(MAKE) clean
-	$(MAKE) build CFLAGS="$(CFLAGS) -Wno-error -fsanitize=address,leak,undefined -g -Og"
+	$(MAKE) build CFLAGS="$(CFLAGS) -Wno-error -fsanitize=address,undefined -g -Og"
 
 install: release
 	if not exist $(INSTALL_DIR) mkdir $(INSTALL_DIR)
