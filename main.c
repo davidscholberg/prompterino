@@ -1,10 +1,5 @@
 #ifdef _WIN32
 
-#include <direct.h>
-
-#define popen _popen
-#define pclose _pclose
-#define S_ISDIR(sb) (((sb) & _S_IFDIR) == _S_IFDIR)
 #define path_sep '\\'
 #define home_env_var "USERPROFILE"
 

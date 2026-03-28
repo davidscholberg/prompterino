@@ -1,10 +1,9 @@
 MAKEFLAGS += --no-print-directory
 CFLAGS = -Wall -Wextra -Werror
-BUILD_DIR = build
-EXE = $(BUILD_DIR)/prompterino
 HEADERS = config.h
 SRCS = main.c
-OBJS = $(SRCS:%.c=$(BUILD_DIR)/%.o)
+BUILD_DIR = build
+EXE = $(BUILD_DIR)/prompterino
 
 .DEFAULT_GOAL := all
 
@@ -12,7 +11,7 @@ $(EXE): $(SRCS) $(HEADERS)
 	mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -o $(EXE) $(SRCS)
 
-.PHONY: all build clean debug install pedantic release sanitize
+.PHONY: all build clean debug install install-mingw install-sanitize pedantic release sanitize
 
 build: $(EXE)
 
@@ -42,3 +41,8 @@ install: release
 
 install-sanitize: sanitize
 	install -C -m 0755 "$(EXE)" "$(HOME)/.local/bin/"
+
+install-mingw:
+	@$(MAKE) clean
+	@$(MAKE) build CFLAGS="$(CFLAGS) -O3" CC="x86_64-w64-mingw32-gcc" EXE="$(EXE).exe"
+	install -C -m 0755 "$(EXE).exe" "/mnt/c/Users/$(USER)/.local/bin/"
